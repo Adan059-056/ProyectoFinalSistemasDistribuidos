@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Servicio para dividir el video
+  video_splitter:
+    build:
+      context: ./video_processor
+    volumes:
+      - ./shared:/shared
+    command: >
+      sh -c "python splitter.py /shared/input_video.mp4 /shared/fragments -n 10"
+    environment:
+      - OVERWRITE_FRAGMENTS=${OVERWRITE_FRAGMENTS:-0}
+
+  tracker:
+    build: ./tracker
+    ports:
+      - "5000:5000"
+    depends_on:
+      - video_splitter
+    networks:
+      - p2p-net
+
+  node1:
+    build: ./node
+    environment:
+      NODE_IP: node1
+      NODE_PORT: 6000
+    volumes:
+      - ./shared:/shared
+      - ./data/node1:/app/fragments
+    ports:
+      - "6000:6000"
+      - "7000:7000"
+    networks:
+      - p2p-net
+    depends_on:
+      - video_splitter
+      - tracker
+
+  node2:
+    build: ./node
+    environment:
+      NODE_IP: node2
+      NODE_PORT: 6001
+    volumes:
+      - ./shared:/shared
+      - ./data/node2:/app/fragments
+    ports:
+      - "6001:6001"
+      - "7001:7001"
+    networks:
+      - p2p-net
+    depends_on:
+      - video_splitter
+      - tracker
+
+networks:
+  p2p-net:
+    driver: bridge
